@@ -1,22 +1,28 @@
-const express = require('express')
-const app = express()
-const port = 3000
+const express = require('express');
+const app = express();
+const port = 3000;
 const path = require('path');
+const fs = require('fs').promises; // Node.js File System module with Promises
+require('dotenv').config();
 
+// Serving static files from 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Root endpoint
 app.get('/', (req, res) => {
-  res.send('hello world')
-})
+    res.send('Hello World!');
+});
 
-app.get('/timetables', (req, res) => {
-    const result = fetchSubwayTimetables();
+// Timetables endpoint
+app.get('/timetables', async (req, res) => {
+    const result = await fetchSubwayTimetables();
     res.send(result);
-})
+});
 
+// Start the server
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
-})
+  console.log(`App listening on port ${port}`);
+});
 
 // Function to fetch subway timetables for Matinkylä station
 async function fetchSubwayTimetables() {
@@ -50,76 +56,63 @@ async function fetchSubwayTimetables() {
         }
     `;
 
-    function intToTime(timestamp, toString = true) {
-        hours = String(parseInt(timestamp/60/60))
-        minutes = String(parseInt((timestamp/60/60 - hours)*60))
+    const intToTime = (timestamp, toString = true) => {
+        let hours = String(parseInt(timestamp / 3600));
+        let minutes = String(parseInt((timestamp % 3600) / 60));
+        return toString ? `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}` : { hours, minutes };
+    };
 
-        if(toString) return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
-        else return {'hours': hours,'minutes': minutes}
-    }
-
-    function minutesToDeparture(currentDate, departureTime) {
-        const departureMinutes = parseInt(departureTime/60)
-        const currentMinutes = currentDate.getHours()*60 + currentDate.getMinutes()
-        return departureMinutes - currentMinutes
-    }
+    const minutesToDeparture = (currentDate, departureTime) => {
+        const departureMinutes = parseInt(departureTime / 60);
+        const currentMinutes = currentDate.getHours() * 60 + currentDate.getMinutes();
+        return departureMinutes - currentMinutes;
+    };
 
     try {
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'digitransit-subscription-key': subscriptionKey // Include the subscription key
+                'digitransit-subscription-key': subscriptionKey
             },
             body: JSON.stringify({ query })
         });
 
         const responseData = await response.json();
 
-        const timetableContainer = document.getElementById('timetable-container');
-        timetableContainer.innerHTML = ''; // Clear previous content
+        const htmlContent = await fs.readFile(path.join(__dirname, 'public', 'dashboard.html'), 'utf8');
+        const $ = require('cheerio').load(htmlContent);
+        const timetableContainer = $('#timetable-container');
 
-        const currentDate = new Date();
+        timetableContainer.empty();
 
         if (responseData.data && responseData.data.stop) {
             const { name, stoptimesWithoutPatterns } = responseData.data.stop;
-
-            const title = document.createElement('h2');
-            title.textContent = `Timetables for ${name}`;
-            timetableContainer.appendChild(title);
+            timetableContainer.append(`<h2>Timetables for ${name}</h2>`);
 
             stoptimesWithoutPatterns.forEach(stopTime => {
                 const { scheduledDeparture, realtimeDeparture, realtime, trip } = stopTime;
-
                 const departureTime = realtime ? realtimeDeparture : scheduledDeparture;
 
-                const inOtaniemi = trip.stoptimes[9]
-                const otaTime = inOtaniemi.scheduledArrival
+                const departureInfo = `<p>Departure Time: ${intToTime(departureTime)} (in ${minutesToDeparture(new Date(), departureTime)} minutes)</p>`;
+                timetableContainer.append(departureInfo);
 
-                const inKamppi = trip.stoptimes[14]
-                const champTime = inKamppi.scheduledArrival
+                trip.stoptimes.forEach((st, index) => {
+                    if ([9, 14].includes(index)) {
+                        const arrivalInfo = `<p>Arrival in ${st.stop.name}: ${intToTime(st.scheduledArrival)}</p>`;
+                        timetableContainer.append(arrivalInfo);
+                    }
+                });
 
-                const departureInfo = document.createElement('p');
-                departureInfo.textContent = `Departure Time: ${intToTime(departureTime)} (in ${minutesToDeparture(currentDate, departureTime)} minutes)`;
-                timetableContainer.appendChild(departureInfo);
-
-                const otaniemiArrivalInfo = document.createElement('p');
-                otaniemiArrivalInfo.textContent = `Arrival in Otaniemi: ${intToTime(otaTime)}`;
-                timetableContainer.appendChild(otaniemiArrivalInfo);
-
-                const kamppiArrivalInfo = document.createElement('p');
-                kamppiArrivalInfo.textContent = `Arrival in Kamppi: ${intToTime(champTime)}`;
-                timetableContainer.appendChild(kamppiArrivalInfo);
-
-                const spacer = document.createElement('hr');
-                timetableContainer.appendChild(spacer);
+                timetableContainer.append('<hr>');
             });
         } else {
-            const noDataMessage = document.createElement('p');
-            noDataMessage.textContent = 'No data found.';
-            timetableContainer.appendChild(noDataMessage);
+            timetableContainer.append('<p>No data found.</p>');
         }
+
+        return $.html(); // Return the modified HTML
     } catch (error) {
         console.error('Error fetching data:', error);
+        return '<p>Error fetching timetables. Please try again later or contact support.</p>';
     }
 }
