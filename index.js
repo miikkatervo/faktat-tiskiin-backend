@@ -110,9 +110,37 @@ async function fetchSubwayTimetables() {
             timetableContainer.append('<p>No data found.</p>');
         }
 
+        // add daily quote
+        const {quote, author} = await fetchDailyQuote();
+        const quoteContainer = $('#quote-container');
+        quoteContainer.empty();
+        quoteContainer.append(`<p>"${quote}"</p>`);
+        quoteContainer.append(`<p>- ${author}</p>`);
+
         return $.html(); // Return the modified HTML
     } catch (error) {
         console.error('Error fetching data:', error);
         return '<p>Error fetching timetables. Please try again later or contact support.</p>';
+    }
+}
+
+
+const fetchDailyQuote = async () => {
+    const apiUrl = 'https://zenquotes.io/api/today';
+    try {
+        const response = await fetch(apiUrl);
+        const responseData = await response.json();
+
+        return {
+            "quote": responseData[0].q, 
+            "author": responseData[0].a
+        };
+
+    } catch (error) {
+        console.error('Error fetching quote data:', error);
+        return {
+            "quote": "Error fetching quote", 
+            "author": "Jape Niskala"
+        };
     }
 }
