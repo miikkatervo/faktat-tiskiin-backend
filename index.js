@@ -79,15 +79,15 @@ async function fetchSubwayTimetables() {
 
                 const imageWidth = 140
                 const height = 38
-                let flameSideLength = height * 1.5
+                let flameSideLength = Math.round(height * 1.5)
 
                 // Build the SVG content as a string
                 const visualisation = `
                                             <div class="image-container" style="position: relative; width: ${imageWidth}px; height: ${height*3}px; display: inline-block; margin-right: 10px; margin-top: 10px;">
                                                 <img src="images/subways/subway-${urgency}.svg" alt="subway-${urgency}" style="width: ${imageWidth}px; height: ${height}px; position: absolute; top: ${flameSideLength}px; left: 0;">
-                                                <img src="images/flames/flame-${urgency}.svg" alt="flame-${urgency}" style="height: ${flameSideLength}px; position: absolute; top: ${flameSideLength-height-20}px; left: 50%;  transform: translate(-50%, 0);">
-                                                <span style="position: absolute; top: ${flameSideLength-height+5}px; left: 50%; transform: translate(-50%, 0); font-family: 'Orbitron', sans-serif; color: black; font-size: 18px; font-weight: 900">${timeToDeparture}</span>
-                                                <span style="position: absolute; top: ${flameSideLength+height}px; left: 50%; transform: translate(-50%, 0); font-family: 'Orbitron', sans-serif; color: dimgrey; font-size: 20px">${intToTime(departureTime)}</span>
+                                                <img src="images/flames/flame-${urgency}.svg" alt="flame-${urgency}" style="height: ${flameSideLength}px; position: absolute; left: 50%;  transform: translate(-50%, 0);">
+                                                <span style="position: absolute; left: 50%; transform: translate(-50%, 110%); font-family: 'Orbitron', sans-serif; color: black; font-size: 18px; font-weight: 900">${timeToDeparture}</span>
+                                                <span style="position: absolute; left: 50%; transform: translate(-50%,375%); font-family: 'Orbitron', sans-serif; color: dimgrey; font-size: 20px">${intToTime(departureTime)}</span>
                                             </div>
                                             `;
 
