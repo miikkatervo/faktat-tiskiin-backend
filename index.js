@@ -104,7 +104,7 @@ async function fetchSubwayTimetables() {
         quoteContainer.empty();
         quoteContainer.css('text-align', 'center');
         quoteContainer.append(`<p>"${quote}"</p>`);
-        // quoteContainer.append(`<p>- ${author}</p>`);
+        quoteContainer.append(`<p style="font-style: normal">- ${author}</p>`);
 
         return $.html(); // Return the modified HTML
     } catch (error) {
