@@ -37,36 +37,10 @@ async function fetchSubwayTimetables() {
                     scheduledDeparture
                     realtimeDeparture
                     realtime
-                    trip {
-                        routeShortName
-                        id
-                        stoptimes {
-                            scheduledArrival
-                            realtimeArrival
-                            realtime
-                            stopSequence
-                            stop {
-                                name
-                                gtfsId
-                            }
-                        }
-                    }
                 }
             }
         }
     `;
-
-    const intToTime = (timestamp, toString = true) => {
-        let hours = String(parseInt(timestamp / 3600));
-        let minutes = String(parseInt((timestamp % 3600) / 60));
-        return toString ? `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}` : { hours, minutes };
-    };
-
-    const minutesToDeparture = (currentDate, departureTime) => {
-        const departureMinutes = parseInt(departureTime / 60);
-        const currentMinutes = currentDate.getHours() * 60 + currentDate.getMinutes();
-        return departureMinutes - currentMinutes;
-    };
 
     try {
         const response = await fetch(apiUrl, {
@@ -79,32 +53,46 @@ async function fetchSubwayTimetables() {
         });
 
         const responseData = await response.json();
+        console.log(responseData)
 
         const htmlContent = await fs.readFile(path.join(__dirname, 'public', 'dashboard.html'), 'utf8');
         const $ = require('cheerio').load(htmlContent);
+
+        // Make timetable container
         const timetableContainer = $('#timetable-container');
-
         timetableContainer.empty();
+        timetableContainer.css('text-align', 'center');
 
+        // Display timetables
         if (responseData.data && responseData.data.stop) {
             const { name, stoptimesWithoutPatterns } = responseData.data.stop;
-            timetableContainer.append(`<h2>Timetables for ${name}</h2>`);
 
-            stoptimesWithoutPatterns.forEach(stopTime => {
-                const { scheduledDeparture, realtimeDeparture, realtime, trip } = stopTime;
-                const departureTime = realtime ? realtimeDeparture : scheduledDeparture;
+            stoptimesWithoutPatterns.forEach((d,i) => {
+                const departureTime = d.realtime ? d.realtimeDeparture : d.scheduledDeparture;
+                const timeToDeparture = minutesToDeparture(departureTime);
 
-                const departureInfo = `<p>Departure Time: ${intToTime(departureTime)} (in ${minutesToDeparture(new Date(), departureTime)} minutes)</p>`;
-                timetableContainer.append(departureInfo);
+                let urgency;
+                if (timeToDeparture < 4) urgency = "grey";
+                else if (timeToDeparture < 6) urgency = "red";
+                else if (timeToDeparture < 9) urgency = "yellow";
+                else urgency = "green";
 
-                trip.stoptimes.forEach((st, index) => {
-                    if ([9, 14].includes(index)) {
-                        const arrivalInfo = `<p>Arrival in ${st.stop.name}: ${intToTime(st.scheduledArrival)}</p>`;
-                        timetableContainer.append(arrivalInfo);
-                    }
-                });
+                const imageWidth = 140
+                const height = 38
+                let flameSideLength = height * 1.5
 
-                timetableContainer.append('<hr>');
+                // Build the SVG content as a string
+                const visualisation = `
+                                            <div class="image-container" style="position: relative; width: ${imageWidth}px; height: ${height*3}px; display: inline-block; margin-right: 10px; margin-top: 10px;">
+                                                <img src="images/subways/subway-${urgency}.svg" style="width: ${imageWidth}px; height: ${height}px; position: absolute; top: ${flameSideLength}px; left: 0;"/>
+                                                <img src="images/flames/flame-${urgency}.svg" style="height: ${flameSideLength}px; position: absolute; top: ${flameSideLength-height-20}px; left: 50%;  transform: translate(-50%, 0);"/>
+                                                <span style="position: absolute; top: ${flameSideLength-height+5}px; left: 50%; transform: translate(-50%, 0); font-family: 'Orbitron', sans-serif; color: black; font-size: 18px; font-weight: 900">${timeToDeparture}</span>
+                                                <span style="position: absolute; top: ${flameSideLength+height}px; left: 50%; transform: translate(-50%, 0); font-family: 'Orbitron', sans-serif; color: dimgrey; font-size: 20px">${intToTime(departureTime)}</span>
+                                            </div>
+                                            `;
+
+                timetableContainer.append(visualisation)
+
             });
         } else {
             timetableContainer.append('<p>No data found.</p>');
@@ -114,8 +102,9 @@ async function fetchSubwayTimetables() {
         const {quote, author} = await fetchDailyQuote();
         const quoteContainer = $('#quote-container');
         quoteContainer.empty();
+        quoteContainer.css('text-align', 'center');
         quoteContainer.append(`<p>"${quote}"</p>`);
-        quoteContainer.append(`<p>- ${author}</p>`);
+        // quoteContainer.append(`<p>- ${author}</p>`);
 
         return $.html(); // Return the modified HTML
     } catch (error) {
@@ -124,6 +113,19 @@ async function fetchSubwayTimetables() {
     }
 }
 
+const intToTime = (timestamp, toString = true) => {
+    let hours = String(parseInt(timestamp / 3600));
+    let minutes = String(parseInt((timestamp % 3600) / 60));
+    return toString ? `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}` : { hours, minutes };
+};
+
+const minutesToDeparture = (departureTime) => {
+    const now = new Date();
+    const currentTime = now.toLocaleTimeString('fi-FI', {timeZone: 'Europe/Helsinki'}).split('.')
+    const departureMinutes = parseInt(departureTime / 60);
+    const currentMinutes = parseInt(currentTime[0]) * 60 + parseInt(currentTime[1]);
+    return departureMinutes - currentMinutes;
+};
 
 const fetchDailyQuote = async () => {
     const apiUrl = 'https://zenquotes.io/api/today';
